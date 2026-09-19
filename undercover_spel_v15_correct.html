@@ -1,0 +1,997 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Undercover</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#111;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}
+.wrap{max-width:650px;margin:auto;padding:20px 16px 40px}h1{text-align:center;font-size:42px;margin:8px 0 2px}.sub{text-align:center;color:#aaa;margin-bottom:22px}
+.panel{background:#1d1d1d;border:1px solid #333;border-radius:18px;padding:20px;margin-bottom:16px}
+label{display:block;color:#bbb;font-size:14px;margin:0 0 7px}
+select,input,button{font:inherit}select,input{width:100%;background:#292929;color:#fff;border:1px solid #444;border-radius:12px;padding:13px;margin-bottom:12px}
+button{width:100%;border:0;border-radius:14px;padding:15px;font-weight:700;cursor:pointer;margin-top:8px;min-height:48px}.primary{background:#fff;color:#111}.secondary{background:#333;color:#fff}.danger{background:#5b2020;color:#fff}
+.choice{display:flex;gap:8px;margin-bottom:14px}.choice button{margin:0;background:#292929;border:1px solid #444;color:#bbb}.choice button.active{background:#fff;color:#111;border-color:#fff}
+.players{display:grid;gap:8px}.playerrow{display:flex;align-items:center;gap:8px}.num{width:30px;color:#888;text-align:center}.playerrow input{margin:0}
+.hidden{display:none!important}.turn{text-align:center}.turn h2{font-size:30px;margin:4px 0 18px}.card{background:#fff;color:#111;border-radius:22px;padding:42px 20px;text-align:center;min-height:240px;display:flex;flex-direction:column;justify-content:center;align-items:center}
+.word{font-size:38px;font-weight:800;letter-spacing:.5px;word-break:break-word}.hint{color:#777;margin-top:10px}.warning{background:#382f12;border:1px solid #66571c;color:#f2df83;padding:12px;border-radius:12px;font-size:14px;margin-bottom:15px}
+.done{text-align:center;padding:35px 10px}.done .check{font-size:64px}.small{font-size:13px;color:#888;text-align:center;margin-top:12px}.host{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px}
+.hostrow{padding:9px 0;border-bottom:1px solid #333;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.role-undercover{color:#ffb347}.role-white{color:#ddd}.role-normal{color:#8ee58e}
+.info{background:#252525;border-radius:12px;padding:11px 12px;color:#bbb;font-size:14px;margin:8px 0 14px}
+
+.winner-banner{
+  margin-top:14px;
+  padding:18px 16px;
+  border-radius:16px;
+  text-align:center;
+  font-size:1.25rem;
+  font-weight:800;
+  background:#333;
+  border:2px solid #777;
+}
+</style>
+<style>#globalNewGame{display:block}#globalNewGame button{margin-top:0}</style></head>
+<body>
+<div class="wrap">
+<h1>UNDERCOVER</h1>
+<div class="sub">Geef de telefoon steeds door. Niet spieken.</div>
+
+<section id="setup" class="panel">
+<label for="count">Aantal spelers</label>
+<select id="count"></select>
+
+<label>Mr. White</label>
+<div class="choice">
+<button id="whiteOn" type="button">Wel Mr. White</button>
+<button id="whiteOff" type="button">Geen Mr. White</button>
+</div>
+
+<div id="roleInfo" class="info"></div>
+
+<label>Spelers</label>
+<div id="players" class="players"></div>
+
+<button class="primary" id="startBtn" type="button">Start spel</button>
+
+<div class="small">De rollen en woorden worden één keer geloot en blijven de hele ronde vaststaan. De puntentelling loopt door over volgende rondes.</div>
+</section>
+
+<section id="turn" class="panel hidden">
+<div class="turn">
+<div class="warning">Geef de telefoon alleen aan deze speler.</div>
+<h2 id="playerName"></h2>
+<div id="before">
+<button class="primary" id="showBtn" type="button">Toon mijn kaart</button>
+<div class="small">Zorg dat niemand anders kan meekijken.</div>
+</div>
+<div id="shown" class="hidden">
+<div class="card"><div class="word" id="word"></div><div class="hint" id="hint"></div></div>
+<button class="secondary" id="nextBtn" type="button">Verberg &amp; volgende speler</button>
+</div>
+</div>
+</section>
+
+<section id="done" class="panel hidden">
+<div class="done"><div class="check">✓</div><h2>Ronde compleet</h2>
+<p>Iedereen heeft zijn kaart gezien. Nu wordt de ronde uitgespeeld.</p></div>
+<button type="button" onclick="openScoring()">Spelers &amp; punten</button>
+
+</section>
+
+<section id="scoring" class="panel hidden">
+<h2>Ronde uitspelen</h2>
+<div class="info">Tik op een naam zodra die speler is uitgeschakeld. De speler krijgt dan automatisch de punten voor het spelen van deze ronde. Tik nogmaals om zijn status te bekijken.</div>
+<div id="winnerChoices" class="choice"></div>
+<div id="whiteGuessSection" class="hidden">
+<label>Mr. White is uitgeschakeld — woord goed geraden?</label>
+<div class="choice">
+<button id="guessYes" type="button">Ja, goed (+5)</button>
+<button id="guessNo" type="button">Nee</button>
+</div>
+</div>
+<div id="roundStatus" class="info"></div>
+<div id="scoreRoundResult" class="small"></div>
+<button class="secondary" id="scoreboardBtn" type="button">Tussenstand</button>
+<button class="secondary" id="newBtn3" type="button">Volgende ronde</button>
+</section>
+
+<section id="scoreboard" class="panel hidden">
+<h2>Tussenstand</h2>
+<div id="scoreList" class="host"></div>
+<button class="secondary" id="newBtn4" type="button">Terug naar ronde</button>
+<button class="secondary" id="newBtn5" type="button">Volgende ronde</button>
+</section>
+
+<section id="host" class="panel hidden"><h2>Ronde uitslag</h2>
+<h2>Spelers &amp; punten</h2>
+<div id="hostList" class="host"></div>
+<div id="hostRoundMessage" class="info"></div>
+</section>
+<section id="globalTotalPointsPanel" class="panel hidden">
+<h2>Totaal punten</h2>
+<div id="globalTotalPointsList" class="host"></div>
+</section>
+<div id="globalNextRound" style="margin-top:10px">
+<button class="secondary" id="globalNextRoundBtn" type="button">Volgende ronde</button>
+</div>
+<div id="globalTotalPoints" style="margin-top:10px">
+<button class="secondary" id="globalTotalPointsBtn" type="button">Totaal punten</button>
+</div>
+<div id="globalNewGame" style="margin-top:18px">
+<button class="danger" id="newGameBtn" type="button">Nieuw spel</button>
+</div>
+</div>
+
+<script>
+const pairs=[
+["appel","peer"],
+["banaan","mango"],
+["sinaasappel","mandarijn"],
+["citroen","limoen"],
+["aardbei","framboos"],
+["kers","pruim"],
+["perzik","nectarine"],
+["ananas","meloen"],
+["watermeloen","cantaloupe"],
+["druif","bes"],
+["kiwi","papaja"],
+["kokosnoot","ananas"],
+["wortel","pastinaak"],
+["aardappel","zoete aardappel"],
+["ui","sjalot"],
+["knoflook","gember"],
+["tomaat","paprika"],
+["komkommer","courgette"],
+["aubergine","courgette"],
+["broccoli","bloemkool"],
+["spinazie","sla"],
+["mais","erwt"],
+["boon","linze"],
+["champignon","truffel"],
+["rijst","couscous"],
+["pasta","noedels"],
+["spaghetti","tagliatelle"],
+["lasagne","moussaka"],
+["pizza","quiche"],
+["hamburger","hotdog"],
+["tosti","sandwich"],
+["pannenkoek","wafel"],
+["cake","taart"],
+["koekje","cracker"],
+["chocolade","bonbon"],
+["ijsje","waterijsje"],
+["popcorn","chips"],
+["noten","pinda's"],
+["kaas","kwark"],
+["yoghurt","vla"],
+["melk","karnemelk"],
+["koffie","espresso"],
+["thee","kruidenthee"],
+["limonade","frisdrank"],
+["water","sap"],
+["soep","saus"],
+["zout","peper"],
+["suiker","honing"],
+["jam","hagelslag"],
+["brood","stokbrood"],
+["croissant","broodje"],
+["ei","omelet"],
+["biefstuk","hamburger"],
+["kip","kalkoen"],
+["worst","gehaktbal"],
+["bacon","ham"],
+["zalm","forel"],
+["tonijn","makreel"],
+["garnaal","kreeft"],
+["mossel","oester"],
+["vis","inktvis"],
+["ijs","sneeuw"],
+["regen","hagel"],
+["mist","wolk"],
+["wind","storm"],
+["bliksem","donder"],
+["zon","maan"],
+["ster","planeet"],
+["aarde","mars"],
+["vulkaan","berg"],
+["berg","heuvel"],
+["dal","vallei"],
+["rivier","beek"],
+["meer","vijver"],
+["zee","oceaan"],
+["strand","duin"],
+["eiland","schiereiland"],
+["bos","jungle"],
+["park","tuin"],
+["weide","akker"],
+["boom","struik"],
+["bloem","plant"],
+["roos","tulp"],
+["gras","mos"],
+["zand","grind"],
+["steen","rots"],
+["grot","tunnel"],
+["waterval","fontein"],
+["dijk","dam"],
+["brug","viaduct"],
+["weg","snelweg"],
+["rotonde","kruispunt"],
+["straat","steeg"],
+["plein","park"],
+["toren","vuurtoren"],
+["kasteel","paleis"],
+["kerk","kathedraal"],
+["museum","galerie"],
+["theater","bioscoop"],
+["hotel","hostel"],
+["camping","bungalowpark"],
+["tent","caravan"],
+["hangmat","ligstoel"],
+["stoel","kruk"],
+["bank","fauteuil"],
+["tafel","bureau"],
+["bed","slaapbank"],
+["kussen","matras"],
+["deken","slaapzak"],
+["kast","kist"],
+["plank","schap"],
+["deur","poort"],
+["raam","luik"],
+["trap","ladder"],
+["lift","roltrap"],
+["dak","zolder"],
+["kelder","garage"],
+["schuur","loods"],
+["huis","villa"],
+["appartement","studio"],
+["kamer","hal"],
+["keuken","kantine"],
+["badkamer","toilet"],
+["douche","bad"],
+["kraan","slang"],
+["emmer","bak"],
+["bezem","stofzuiger"],
+["dweil","mop"],
+["wasmachine","droger"],
+["strijkijzer","föhn"],
+["koelkast","vriezer"],
+["oven","magnetron"],
+["waterkoker","koffiezetapparaat"],
+["pan","wok"],
+["pot","ketel"],
+["bord","schaal"],
+["kom","bakje"],
+["glas","beker"],
+["mok","kopje"],
+["fles","kan"],
+["mes","vork"],
+["lepel","spatel"],
+["schaar","tang"],
+["hamer","bijl"],
+["zaag","slijptol"],
+["boormachine","schroevendraaier"],
+["spijker","schroef"],
+["touw","kabel"],
+["ketting","koord"],
+["slot","hangslot"],
+["sleutel","code"],
+["zaklamp","lantaarn"],
+["kaars","fakkel"],
+["lucifer","aansteker"],
+["paraplu","regenjas"],
+["jas","vest"],
+["trui","hoodie"],
+["shirt","blouse"],
+["broek","short"],
+["rok","jurk"],
+["pak","kostuum"],
+["sjaal","das"],
+["pet","hoed"],
+["handschoen","want"],
+["schoen","laars"],
+["sandaal","slipper"],
+["riem","bretels"],
+["bril","zonnebril"],
+["horloge","wekker"],
+["ring","armband"],
+["ketting","hanger"],
+["portemonnee","handtas"],
+["rugzak","sporttas"],
+["koffer","reistas"],
+["parasol","luifel"],
+["handdoek","badjas"],
+["zeep","shampoo"],
+["tandenborstel","kam"],
+["tandpasta","mondwater"],
+["parfum","deodorant"],
+["scheermes","tondeuse"],
+["spiegel","camera"],
+["foto","schilderij"],
+["boek","tijdschrift"],
+["krant","folder"],
+["pen","potlood"],
+["stift","krijtje"],
+["gum","puntenslijper"],
+["liniaal","meetlat"],
+["schrift","notitieboek"],
+["agenda","kalender"],
+["kaart","plattegrond"],
+["kompas","gps"],
+["verrekijker","telescoop"],
+["vergrootglas","microscoop"],
+["camera","verrekijker"],
+["telefoon","tablet"],
+["laptop","computer"],
+["toetsenbord","controller"],
+["muis","trackpad"],
+["koptelefoon","oordopjes"],
+["speaker","radio"],
+["televisie","beamer"],
+["afstandsbediening","controller"],
+["oplader","powerbank"],
+["batterij","accu"],
+["stekker","adapter"],
+["kabel","snoer"],
+["lamp","spot"],
+["ventilator","airco"],
+["thermometer","barometer"],
+["klok","timer"],
+["fiets","brommer"],
+["fiets","scooter"],
+["motor","scooter"],
+["motor","quad"],
+["auto","kart"],
+["auto","taxi"],
+["bus","tram"],
+["tram","metro"],
+["trein","metro"],
+["trein","hogesnelheidstrein"],
+["vliegtuig","helikopter"],
+["vliegtuig","zweefvliegtuig"],
+["raket","satelliet"],
+["boot","schip"],
+["zeilboot","motorboot"],
+["kano","kajak"],
+["kajak","roeiboot"],
+["surfplank","sup"],
+["jetski","speedboot"],
+["veerboot","pont"],
+["onderzeeër","duikboot"],
+["vrachtwagen","bestelbus"],
+["tractor","graafmachine"],
+["kraanwagen","heftruck"],
+["ambulance","brandweerwagen"],
+["politieauto","taxi"],
+["raceauto","rallyauto"],
+["trekker","tractor"],
+["aanhanger","caravan"],
+["caravan","camper"],
+["garage","werkplaats"],
+["tankstation","laadstation"],
+["benzine","diesel"],
+["benzine","elektriciteit"],
+["motorolie","remvloeistof"],
+["band","wiel"],
+["wiel","rupsband"],
+["helm","pet"],
+["gordel","harnas"],
+["motorpak","overall"],
+["skateboard","longboard"],
+["rolschaats","schaats"],
+["ski","snowboard"],
+["slee","skateboard"],
+["voetbal","rugby"],
+["voetbal","handbal"],
+["basketbal","volleybal"],
+["tennis","badminton"],
+["hockey","lacrosse"],
+["golf","honkbal"],
+["boksen","kickboksen"],
+["judo","karate"],
+["worstelen","sumo"],
+["boogschieten","darten"],
+["hardlopen","wandelen"],
+["zwemmen","duiken"],
+["surfen","kitesurfen"],
+["roeien","kajakken"],
+["zeilen","varen"],
+["klimmen","boulderen"],
+["parachutespringen","bungeejumpen"],
+["motorracen","autoracen"],
+["wielrennen","mountainbiken"],
+["marathon","sprint"],
+["trainer","scheidsrechter"],
+["coach","trainer"],
+["keeper","doelman"],
+["aanvaller","verdediger"],
+["team","ploeg"],
+["wedstrijd","toernooi"],
+["medaille","beker"],
+["trofee","kampioensschaal"],
+["fluit","hoorn"],
+["bal","frisbee"],
+["net","doel"],
+["racket","batje"],
+["handschoen","bokshandschoen"],
+["fietshelm","motorhelm"],
+["zwembril","duikbril"],
+["zwembad","waterpark"],
+["sauna","stoombad"],
+["sportschool","fitnessclub"],
+["camping","vakantiepark"],
+["strand","zwembad"],
+["tent","camper"],
+["paspoort","identiteitskaart"],
+["rijbewijs","ov-chipkaart"],
+["ticket","kaartje"],
+["treinkaartje","vliegticket"],
+["koffer","rugzak"],
+["hotel","resort"],
+["hostel","pension"],
+["kamer","suite"],
+["receptie","balie"],
+["lift","trap"],
+["sleutelkaart","kamersleutel"],
+["reisgids","plattegrond"],
+["souvenir","cadeau"],
+["markt","bazaar"],
+["winkel","supermarkt"],
+["bakker","slager"],
+["slager","vishandel"],
+["apotheek","drogist"],
+["ziekenhuis","kliniek"],
+["dokter","tandarts"],
+["verpleegkundige","dokter"],
+["politie","marechaussee"],
+["brandweer","ambulance"],
+["school","universiteit"],
+["klaslokaal","collegezaal"],
+["leraar","professor"],
+["student","leerling"],
+["examen","toets"],
+["huiswerk","opdracht"],
+["boek","leerboek"],
+["bibliotheek","boekhandel"],
+["kantoor","werkplaats"],
+["vergadering","presentatie"],
+["manager","directeur"],
+["baas","chef"],
+["collega","teamgenoot"],
+["contract","factuur"],
+["rekening","bon"],
+["geld","munt"],
+["munt","biljet"],
+["portemonnee","kluis"],
+["bank","geldautomaat"],
+["creditcard","pinpas"],
+["winkelwagen","mandje"],
+["kassa","balie"],
+["prijs","korting"],
+["cadeau","pakket"],
+["doos","krat"],
+["fles","blikje"],
+["blik","pot"],
+["zak","tas"],
+["envelop","brief"],
+["brief","kaartje"],
+["post","pakketdienst"],
+["telefoon","brief"],
+["vriend","buurman"],
+["familie","gezin"],
+["broer","zus"],
+["vader","oom"],
+["moeder","tante"],
+["opa","oma"],
+["kind","baby"],
+["man","jongen"],
+["vrouw","meisje"],
+["bruiloft","verjaardag"],
+["feest","festival"],
+["concert","theater"],
+["muziek","podcast"],
+["film","serie"],
+["acteur","zanger"],
+["zanger","muzikant"],
+["gitaar","viool"],
+["piano","keyboard"],
+["drums","trommel"],
+["fluit","klarinet"],
+["microfoon","speaker"],
+["podium","tribune"],
+["publiek","toeschouwers"],
+["dans","gymnastiek"],
+["schilder","tekenaar"],
+["schilderij","tekening"],
+["pen","kwast"],
+["verf","inkt"],
+["puzzel","raadsel"],
+["spel","wedstrijd"],
+["dobbelsteen","munt"],
+["kaartspel","bordspel"],
+["schaakbord","damspel"],
+["schaakstuk","damsteen"],
+["pion","toren"],
+["koning","koningin"],
+["joker","boer"],
+["quiz","examen"],
+["raadsel","mysterie"],
+["detective","politie"],
+["spion","detective"],
+["schat","geld"],
+["schatkist","kluis"],
+["piratenschip","zeilschip"],
+["piraat","zeeman"],
+["kapitein","schipper"],
+["soldaat","marinier"],
+["officier","commandant"],
+["leger","marine"],
+["kazerne","basis"],
+["kamp","kazerne"],
+["uniform","pak"],
+["laars","combatboot"],
+["helm","baret"],
+["rugzak","veldtas"],
+["tent","onderkomen"],
+["kompas","kaart"],
+["radio","walkietalkie"],
+["antenne","mast"],
+["verrekijker","nachtkijker"],
+["zaklamp","hoofdlamp"],
+["mes","multitool"],
+["touw","paracord"],
+["vuur","fornuis"],
+["kampvuur","barbecue"],
+["barbecue","grill"],
+["hout","tak"],
+["boomstam","plank"],
+["bijl","zaag"],
+["waterfles","veldfles"],
+["thermosfles","waterkoker"],
+["regenjas","poncho"],
+["winterjas","ski-jas"],
+["gletsjer","sneeuwberg"],
+["skipiste","skihelling"],
+["skilift","kabelbaan"],
+["gondel","kabelbaan"],
+["bergpas","tunnel"],
+["bergmeer","kratermeer"],
+["waterval","rivier"],
+["canyon","kloof"],
+["grot","canyon"],
+["woestijn","steppe"],
+["savanne","prairie"],
+["jungle","regenwoud"],
+["oerwoud","jungle"],
+["pool","gletsjer"],
+["noordpool","zuidpool"],
+["zonsondergang","zonsopkomst"],
+["dag","nacht"],
+["ochtend","avond"],
+["middag","nacht"],
+["week","maand"],
+["maand","jaar"],
+["zomer","winter"],
+["lente","herfst"],
+["warmte","hitte"],
+["kou","vorst"],
+["schaduw","duisternis"],
+["licht","lamp"],
+["geluid","muziek"],
+["stilte","rust"],
+["snelheid","tempo"],
+["hoogte","diepte"],
+["breedte","lengte"],
+["groot","klein"],
+["hard","zacht"],
+["nat","droog"],
+["vol","leeg"],
+["open","dicht"],
+["nieuw","oud"],
+["jong","oud"],
+["licht","zwaar"],
+["warm","koud"],
+["hoog","laag"],
+["links","rechts"],
+["vooruit","achteruit"],
+["boven","onder"],
+["binnen","buiten"],
+["begin","einde"],
+["vraag","antwoord"],
+["waarheid","leugen"],
+["ja","nee"],
+["vriend","vijand"],
+["winnen","verliezen"],
+["aanvallen","verdedigen"],
+["zoeken","vinden"],
+["geven","nemen"],
+["kopen","verkopen"],
+["bouwen","slopen"],
+["maken","breken"],
+["stijgen","dalen"],
+["vallen","springen"],
+["lopen","rennen"],
+["kijken","zien"],
+["horen","luisteren"],
+["praten","fluisteren"],
+["lachen","huilen"],
+["slapen","waken"],
+["werken","rusten"],
+["leren","studeren"],
+["lezen","schrijven"],
+["tekenen","schilderen"],
+["snijden","hakken"],
+["gooien","vangen"],
+["duwen","trekken"],
+["openen","sluiten"],
+["pakken","loslaten"]
+];
+
+const defaults=["Speler 1","Speler 2","Speler 3","Speler 4","Speler 5","Speler 6","Speler 7","Speler 8","Speler 9","Speler 10","Speler 11","Speler 12","Speler 13","Speler 14","Speler 15","Speler 16"];
+let state=null, whiteEnabled=true, selectedWinner=null, whiteGuess=null;
+
+const countEl=document.getElementById("count");
+for(let i=4;i<=16;i++){const o=document.createElement("option");o.value=i;o.textContent=i+" spelers";countEl.appendChild(o)}
+countEl.value=6;
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function renderPlayers(){
+ const n=Number(countEl.value), box=document.getElementById("players");box.innerHTML="";
+ for(let i=0;i<n;i++){const row=document.createElement("div");row.className="playerrow";row.innerHTML='<div class="num">'+(i+1)+'</div><input id="p'+i+'" maxlength="20" autocomplete="off">';box.appendChild(row);document.getElementById("p"+i).value=defaults[i]}
+ updateInfo();
+}
+function updateInfo(){
+ const n=Number(countEl.value), wc=whiteEnabled?1:0, uc=1, normal=n-wc-uc;
+ document.getElementById("roleInfo").textContent=normal+" normaal · 1 Undercover · "+(whiteEnabled?"1 Mr. White":"0 Mr. White");
+}
+function setWhite(v){whiteEnabled=v;document.getElementById("whiteOn").classList.toggle("active",v);document.getElementById("whiteOff").classList.toggle("active",!v);updateInfo()}
+
+document.getElementById("whiteOn").addEventListener("click",()=>setWhite(true));
+document.getElementById("whiteOff").addEventListener("click",()=>setWhite(false));
+
+countEl.addEventListener("change",renderPlayers);
+
+function choosePair(){
+ let used=[];try{used=JSON.parse(localStorage.getItem("undercoverUsedPairs")||"[]")}catch(e){}
+ let available=pairs.filter(p=>!used.includes(p.join("|")));
+ if(!available.length){used=[];available=pairs.slice()}
+ const pair=available[Math.floor(Math.random()*available.length)];
+ used.push(pair.join("|"));localStorage.setItem("undercoverUsedPairs",JSON.stringify(used));return pair;
+}
+function save(){if(state)localStorage.setItem("undercoverGameState",JSON.stringify(state))}
+function startGame(preserveScores=false){
+ const n=Number(countEl.value),names=[];
+ for(let i=0;i<n;i++){const v=document.getElementById("p"+i).value.trim();names.push(v||("Speler "+(i+1)))}
+
+ let priorScores=Array(n).fill(0);
+ if(preserveScores && state && Array.isArray(state.scores)){
+   // Keep the cumulative score when starting the next round.
+   priorScores=names.map((_,i)=>Number(state.scores[i]||0));
+ }
+
+ const pair=choosePair();
+ const roles=Array(n).fill("normal"), idx=shuffle([...Array(n).keys()]);
+ roles[idx[0]]="undercover";if(whiteEnabled)roles[idx[1]]="white";
+
+ state={
+   names,pair,roles,current:0,revealed:false,whiteEnabled,
+   scores:priorScores,scoreApplied:false,selectedWinner:null,
+   whiteGuess:null,whiteGuessSet:false,
+   eliminated:Array(n).fill(false),
+   baseAwarded:Array(n).fill(false),
+   revealedStatus:Array(n).fill("")
+ };
+
+ save();
+ document.getElementById("setup").classList.add("hidden");
+ document.getElementById("done").classList.add("hidden");
+ document.getElementById("host").classList.add("hidden");
+ document.getElementById("scoring").classList.add("hidden");
+ document.getElementById("scoreboard").classList.add("hidden");
+ document.getElementById("turn").classList.remove("hidden");
+ updateTurn();
+}
+function updateTurn(){
+ state.revealed=false;document.getElementById("playerName").textContent=state.names[state.current];
+ document.getElementById("before").classList.remove("hidden");document.getElementById("shown").classList.add("hidden");save();
+}
+function showCard(){
+ const role=state.roles[state.current],word=role==="normal"?state.pair[0]:role==="undercover"?state.pair[1]:"MR. WHITE";
+ const hint=role==="normal"?"Onthoud je woord.":role==="undercover"?"Je hebt een ander woord. Probeer niet op te vallen.":"Je hebt geen woord. Bluff je erdoorheen.";
+ document.getElementById("word").textContent=word;document.getElementById("hint").textContent=hint;
+ document.getElementById("before").classList.add("hidden");document.getElementById("shown").classList.remove("hidden");state.revealed=true;save();
+}
+function nextPlayer(){
+ if(!state.revealed)return;state.current++;
+ if(state.current>=state.names.length){document.getElementById("turn").classList.add("hidden");document.getElementById("done").classList.remove("hidden");save();return}
+ updateTurn();
+}
+function esc(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function showHost(){
+ const box=document.getElementById("hostList");box.innerHTML="";
+ state.names.forEach((name,i)=>{
+   const row=document.createElement("div");row.className="hostrow";
+   const btn=document.createElement("button");
+   btn.type="button";btn.className="secondary";btn.style.margin="0";btn.style.width="auto";btn.style.flex="1";btn.textContent=name;
+   const result=document.createElement("span");result.textContent="Klik om status te tonen";result.style.color="#888";result.style.alignSelf="center";
+   btn.addEventListener("click",()=>{
+     const role=state.roles[i];
+     const r=role==="normal"?"Burger":role==="undercover"?"Undercover":"Mr. White";
+     const w=role==="normal"?state.pair[0]:role==="undercover"?state.pair[1]:"—";
+     result.textContent=r+" · "+w;
+     result.className=role==="normal"?"role-normal":role==="undercover"?"role-undercover":"role-white";
+   });
+   row.appendChild(btn);row.appendChild(result);box.appendChild(row);
+ });
+ document.getElementById("done").classList.add("hidden");document.getElementById("host").classList.remove("hidden");
+}
+
+
+function openScoring(){
+ document.getElementById("done").classList.add("hidden");
+ document.getElementById("scoring").classList.add("hidden");
+ document.getElementById("host").classList.remove("hidden");
+ renderHostPlayers();
+ checkAutomaticWin();
+}
+function renderHostPlayers(){
+ const box=document.getElementById("hostList");box.innerHTML="";
+ state.names.forEach((name,i)=>{
+   const row=document.createElement("div");row.className="hostrow";
+   const btn=document.createElement("button");btn.type="button";btn.className="secondary";btn.style.margin="0";btn.style.flex="1";btn.textContent=name;
+   const result=document.createElement("span");result.style.alignSelf="center";result.style.color="#888";
+   if(state.eliminated&&state.eliminated[i]){
+     let text=state.revealedStatus&&state.revealedStatus[i] ? state.revealedStatus[i] : "uitgeschakeld";
+     if(state.winner){
+       const r=state.roles[i];
+       const w=r==="normal"?state.pair[0]:r==="undercover"?state.pair[1]:"—";
+       text += " · "+w;
+     }
+     result.textContent=text;
+   }else{
+     result.textContent="in spel";
+   }
+   btn.addEventListener("click",()=>handlePlayerTap(i,result));
+   row.appendChild(btn);row.appendChild(result);box.appendChild(row);
+ });
+ updateRoundStatus();
+}
+function handlePlayerTap(i,result){
+ if(!state.revealedStatus) state.revealedStatus=Array(state.names.length).fill("");
+ const role=state.roles[i];
+ const roleName=role==="normal"?"Burger":role==="undercover"?"Undercover":"Mr. White";
+ const word=role==="normal"?state.pair[0]:role==="undercover"?state.pair[1]:"—";
+
+ // First tap eliminates the player and awards their per-round role points.
+ if(!state.eliminated[i]){
+   state.eliminated[i]=true;
+   const base=role==="normal"?1:role==="undercover"?2:3;
+   if(!state.baseAwarded[i]){state.scores[i]+=base;state.baseAwarded[i]=true;}
+   state.revealedStatus[i]=roleName+" · +"+base+" ronde";
+   save();
+   result.textContent=state.revealedStatus[i];
+   updateRoundStatus();
+   checkAutomaticWin();
+   if(state.scoreApplied) return;
+   if(role==="white" && state.whiteEnabled && !state.whiteGuessSet){
+     showWhiteGuess();
+     return;
+   }
+ }else{
+   if(state.winner){
+     result.textContent=state.revealedStatus[i]+" · "+word;
+   }else{
+     result.textContent=state.revealedStatus[i];
+   }
+ }
+}
+function updateRoundStatus(){
+ const alive=state.names.filter((_,i)=>!state.eliminated[i]).length;
+ const ucAlive=!state.eliminated[state.roles.indexOf("undercover")];
+ const whiteIndex=state.roles.indexOf("white");
+ const whiteAlive=whiteIndex>=0&&!state.eliminated[whiteIndex];
+ let msg=alive+" speler(s) nog in het spel.";
+ if(!ucAlive && !whiteAlive) msg+=" De burgers hebben alle tegenstanders uitgeschakeld.";
+ else if(!ucAlive) msg+=" De Undercover ligt eruit.";
+ else if(state.whiteEnabled && !whiteAlive) msg+=" Mr. White ligt eruit.";
+ else if(alive<=1) msg+=" Er is nog maar één speler over.";
+ document.getElementById("hostRoundMessage").textContent=msg;
+}
+function checkAutomaticWin(){
+ const uc=state.roles.indexOf("undercover"), wi=state.roles.indexOf("white");
+ const ucOut=state.eliminated[uc];
+ const whiteOut=wi<0 || state.eliminated[wi];
+ const alive=state.names.filter((_,i)=>!state.eliminated[i]).length;
+
+ // Normal win condition: all infiltrators are out.
+ if(ucOut && whiteOut){
+   finishRound("Burgers");
+   return;
+ }
+ // If only one player remains, the remaining side wins.
+ if(alive<=1){
+   const last=state.eliminated.findIndex(v=>!v);
+   if(last>=0){
+     const r=state.roles[last];
+     finishRound(r==="normal"?"Burgers":r==="undercover"?"Undercover":"Mr. White");
+   }
+ }
+}
+function finishRound(winner){
+ if(state.scoreApplied)return;
+ state.winner=winner;
+
+ // When citizens win, all remaining citizens are automatically handled.
+ // They receive their normal +1 round point (if not already awarded) and
+ // are marked eliminated so their names can no longer be tapped.
+ if(winner==="Burgers"){
+   state.roles.forEach((role,i)=>{
+     if(role==="normal" && !state.eliminated[i]){
+       state.eliminated[i]=true;
+       if(!state.baseAwarded[i]){
+         state.scores[i]+=1;
+         state.baseAwarded[i]=true;
+       }
+       state.revealedStatus[i]="Burger · +1 ronde";
+     }
+   });
+ }
+
+ // Winner bonus: 5 for burgers, 8 for Undercover/Mr White.
+ state.roles.forEach((role,i)=>{
+   const won=(winner==="Burgers"&&role==="normal") ||
+             (winner==="Undercover"&&role==="undercover") ||
+             (winner==="Mr. White"&&role==="white");
+   if(won)state.scores[i]+=role==="normal"?5:8;
+ });
+ // Mr White can get +5 for correctly guessing the citizen word.
+ if(state.whiteEnabled){
+   const wi=state.roles.indexOf("white");
+   if(wi>=0 && state.whiteGuess===true) state.scores[wi]+=5;
+ }
+ state.scoreApplied=true;save();
+ document.getElementById("hostRoundMessage").innerHTML='<div class="winner-banner">🏆 WINNAAR: '+esc(winner)+'<br><span style="font-size:.9rem;font-weight:500">Winstpunten zijn toegekend.</span></div>';
+ renderHostPlayers();
+ // After the winner is known, reveal both words/statuses in the player list.
+ state.revealWords=true;
+ renderHostPlayers();
+ document.getElementById("hostRoundMessage").innerHTML='<div class="winner-banner">🏆 WINNAAR: '+esc(winner)+'<br><span style="font-size:.9rem;font-weight:500">Winstpunten zijn toegekend.</span></div>';
+}
+function showWhiteGuess(){
+ const wi=state.roles.indexOf("white");
+ if(wi<0 || !state.eliminated[wi] || state.whiteGuessSet)return;
+ document.getElementById("scoring").classList.remove("hidden");
+ document.getElementById("host").classList.add("hidden");
+ document.getElementById("whiteGuessSection").classList.remove("hidden");
+}
+function chooseWhiteGuess(v){
+ if(state.whiteGuessSet)return;
+ state.whiteGuess=v;state.whiteGuessSet=true;save();
+ const wi=state.roles.indexOf("white");
+ if(v) state.scores[wi]+=5;
+ document.getElementById("whiteGuessSection").classList.add("hidden");
+ document.getElementById("host").classList.remove("hidden");
+ renderHostPlayers();
+}
+function showScoreboard(){
+ const box=document.getElementById("scoreList");box.innerHTML="";
+ const order=state.names.map((name,i)=>({name,score:state.scores[i]})).sort((a,b)=>b.score-a.score);
+ order.forEach((x,pos)=>{
+   const d=document.createElement("div");d.className="hostrow";
+   d.innerHTML="<span>"+(pos+1)+". "+esc(x.name)+"</span><strong>"+x.score+" punten</strong>";
+   box.appendChild(d);
+ });
+ document.getElementById("host").classList.add("hidden");
+ document.getElementById("scoring").classList.add("hidden");
+ document.getElementById("scoreboard").classList.remove("hidden");
+}
+function newRound(){
+ if(!state){
+   document.getElementById("setup").classList.remove("hidden");
+   renderPlayers();
+   return;
+ }
+
+ // Start the next round immediately with the same players and cumulative scores.
+ const previousNames=state.names.slice();
+ const previousCount=state.names.length;
+ const previousWhite=state.whiteEnabled;
+ const previousScores=state.scores.slice();
+
+ countEl.value=previousCount;
+ setWhite(previousWhite);
+ renderPlayers();
+ for(let i=0;i<previousNames.length;i++){
+   const el=document.getElementById("p"+i);
+   if(el)el.value=previousNames[i];
+ }
+
+ // Keep the finished round's scores available while startGame creates the new round.
+ state.scores=previousScores;
+ startGame(true);
+}
+
+function startCompletelyNewGame(){
+ if(!confirm("Nieuw spel starten? De huidige puntentelling wordt op 0 gezet.")) return;
+ localStorage.removeItem("undercoverGameState");
+ state=null;
+ selectedWinner=null;
+ whiteGuess=null;
+ document.getElementById("setup").classList.remove("hidden");
+ document.getElementById("turn").classList.add("hidden");
+ document.getElementById("done").classList.add("hidden");
+ document.getElementById("host").classList.add("hidden");
+ document.getElementById("scoring").classList.add("hidden");
+ document.getElementById("scoreboard").classList.add("hidden");
+ renderPlayers();
+}
+
+function showGlobalTotalPoints(){
+ const panel=document.getElementById("globalTotalPointsPanel");
+ const box=document.getElementById("globalTotalPointsList");
+ if(!state){
+   box.innerHTML='<div class="info">Er is nog geen spel gestart.</div>';
+   panel.classList.remove("hidden");
+   return;
+ }
+ const ranking=state.names.map((name,i)=>({name,score:Number(state.scores[i]||0),index:i}))
+   .sort((a,b)=>b.score-a.score || a.index-b.index);
+ box.innerHTML="";
+ ranking.forEach((p,idx)=>{
+   const row=document.createElement("div");
+   row.className="hostrow";
+   const name=document.createElement("div");
+   name.style.flex="1";
+   name.textContent=(idx+1)+". "+p.name;
+   const score=document.createElement("div");
+   score.textContent=p.score+" punten";
+   score.style.fontWeight="700";
+   row.appendChild(name);
+   row.appendChild(score);
+   box.appendChild(row);
+ });
+ panel.classList.remove("hidden");
+ panel.scrollIntoView({behavior:"smooth",block:"start"});
+}
+document.getElementById("startBtn").addEventListener("click",startGame);
+document.getElementById("newGameBtn").addEventListener("click",startCompletelyNewGame);
+document.getElementById("globalNextRoundBtn").addEventListener("click",()=>{
+ if(state && state.winner){
+   newRound();
+   return;
+ }
+ if(confirm("Volgende ronde starten? De huidige puntentelling blijft behouden en er wordt een nieuwe ronde gestart.")){
+   newRound();
+ }
+});
+document.getElementById("globalTotalPointsBtn").addEventListener("click",showGlobalTotalPoints);document.getElementById("showBtn").addEventListener("click",showCard);document.getElementById("nextBtn").addEventListener("click",nextPlayer);
+document.getElementById("hostBtn")?.addEventListener("click",openScoring);
+document.getElementById("scoreboardBtn")?.addEventListener("click",showScoreboard);
+document.getElementById("guessYes")?.addEventListener("click",()=>chooseWhiteGuess(true));
+document.getElementById("guessNo")?.addEventListener("click",()=>chooseWhiteGuess(false));
+document.getElementById("backToRoundBtn")?.addEventListener("click",()=>{document.getElementById("host").classList.add("hidden");document.getElementById("done").classList.remove("hidden");});
+document.getElementById("newBtn1")?.addEventListener("click",newRound);
+
+document.getElementById("newBtn2")?.addEventListener("click",newRound);
+document.getElementById("newBtn3")?.addEventListener("click",newRound);
+document.getElementById("newBtn4")?.addEventListener("click",()=>{document.getElementById("scoreboard").classList.add("hidden");document.getElementById("host").classList.remove("hidden");});
+document.getElementById("newBtn5")?.addEventListener("click",newRound);
+
+setWhite(true);renderPlayers();
+
+try{
+ const saved=JSON.parse(localStorage.getItem("undercoverGameState")||"null");
+ if(saved&&saved.names&&saved.roles&&saved.pair){
+  state=saved;whiteEnabled=!!saved.whiteEnabled;
+  if(!Array.isArray(state.scores)||state.scores.length!==state.names.length) state.scores=Array(state.names.length).fill(0);
+  if(typeof state.scoreApplied!=="boolean") state.scoreApplied=false;
+  if(!Array.isArray(state.eliminated)||state.eliminated.length!==state.names.length) state.eliminated=Array(state.names.length).fill(false);
+  if(!Array.isArray(state.baseAwarded)||state.baseAwarded.length!==state.names.length) state.baseAwarded=Array(state.names.length).fill(false);
+  if(!Array.isArray(state.revealedStatus)||state.revealedStatus.length!==state.names.length) state.revealedStatus=Array(state.names.length).fill("");
+  if(typeof state.whiteGuessSet!=="boolean") state.whiteGuessSet=false;
+  if(state.current>=state.names.length){document.getElementById("setup").classList.add("hidden");document.getElementById("done").classList.remove("hidden")}
+  else{document.getElementById("setup").classList.add("hidden");document.getElementById("turn").classList.remove("hidden");updateTurn()}
+ }
+}catch(e){}
+</script>
+</body>
+</html>
